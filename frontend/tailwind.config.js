@@ -35,6 +35,9 @@ export default {
         },
         success: '#00ff88',
         alert: '#ff3d3d',
+        'text-primary': '#f0f0f8',
+        'text-secondary': '#b0b0cc',
+        'text-dim': '#7878a0',
       },
       fontFamily: {
         body: ['Outfit', 'system-ui', 'sans-serif'],

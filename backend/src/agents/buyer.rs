@@ -19,6 +19,7 @@ impl BuyerAgent {
                 prompt: prompt.to_string(),
                 bounty_sats,
                 stake_sats,
+                buyer_pubkey: Some(self.pubkey.clone()),
             })
             .send()
             .await?

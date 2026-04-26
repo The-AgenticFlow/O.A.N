@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 
 interface L402Challenge {
   macaroon: string
@@ -46,6 +46,27 @@ export function useL402() {
       console.error('Failed to fetch L402 challenge:', error)
     }
   }, [])
+
+  useEffect(() => {
+    checkAuth()
+  }, [checkAuth])
+
+  useEffect(() => {
+    if (challenge && !isAuthenticated) {
+      const interval = setInterval(async () => {
+        try {
+          const res = await fetch('/api/tasks')
+          if (res.status !== 402) {
+            setIsAuthenticated(true)
+            setChallenge(null)
+          }
+        } catch (error) {
+          console.error('Auth check failed:', error)
+        }
+      }, 5000)
+      return () => clearInterval(interval)
+    }
+  }, [challenge, isAuthenticated])
 
   const payForAccess = useCallback(async () => {
     if (!challenge) return

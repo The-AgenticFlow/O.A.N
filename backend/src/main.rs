@@ -12,11 +12,24 @@ use axum::{
 use std::sync::Arc;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tokio::sync::Mutex;
 
 pub struct AppState {
     pub db: db::Database,
     pub config: Config,
     pub wallet: wallet::MdkClient,
+    pub running_agents: Mutex<Vec<routes::agents::AgentHandle>>,
+}
+
+impl Clone for AppState {
+    fn clone(&self) -> Self {
+        Self {
+            db: self.db.clone(),
+            config: self.config.clone(),
+            wallet: self.wallet.clone(),
+            running_agents: Mutex::new(vec![]),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -27,6 +40,7 @@ pub struct Config {
     pub fireworks_model: String,
     pub lexe_seed: Option<String>,
     pub mdk_wallet_port: u16,
+    pub api_url: String,
 }
 
 impl Default for Config {
@@ -42,6 +56,8 @@ impl Default for Config {
                 .ok()
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(3456),
+            api_url: std::env::var("OAN_API_URL")
+                .unwrap_or_else(|_| "http://localhost:3000".to_string()),
         }
     }
 }
@@ -73,6 +89,7 @@ async fn main() -> anyhow::Result<()> {
         db,
         config,
         wallet,
+        running_agents: Mutex::new(vec![]),
     });
 
     let app = Router::new()
@@ -80,11 +97,17 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/tasks", get(routes::tasks::list_tasks).post(routes::tasks::create_task))
         .route("/api/tasks/:id", get(routes::tasks::get_task))
         .route("/api/tasks/:id/claim", post(routes::tasks::claim_task))
+        .route("/api/tasks/:id/assign", post(routes::tasks::assign_task))
         .route("/api/tasks/:id/submit", post(routes::tasks::submit_task))
         .route("/api/tasks/:id/status", get(routes::tasks::task_status))
+        .route("/api/tasks/:id/reset", post(routes::tasks::reset_task))
         .route("/api/webhooks/payment", post(routes::webhooks::payment_webhook))
         .route("/api/agent/balance", get(routes::agent::get_balance))
         .route("/api/agent/withdraw", post(routes::agent::withdraw))
+        .route("/api/agents", get(routes::agents::list_agents).post(routes::agents::create_agent))
+        .route("/api/agents/spawn", post(routes::agents::spawn_agent))
+        .route("/api/agents/:id/stop", post(routes::agents::stop_agent))
+        .route("/api/activity", get(routes::activity::list_activity))
         .route("/api/l402/verify", post(routes::l402::verify_token))
         .route("/api/wallet/balance", get(routes::wallet::get_balance))
         .route("/api/wallet/receive", post(routes::wallet::receive))
@@ -96,6 +119,8 @@ async fn main() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
     tracing::info!("🚀 OAN Backend listening on http://localhost:3000");
     tracing::info!("💰 MDK Wallet on http://localhost:{}", state.config.mdk_wallet_port);
+    
+    tokio::spawn(wallet::start_payment_poller(state.clone()));
     
     axum::serve(listener, app).await?;
 

@@ -52,6 +52,7 @@ pub struct Task {
     pub worker_pubkey: Option<String>,
     pub worker_invoice: Option<String>,
     pub result: Option<String>,
+    pub failure_reason: Option<String>,
     pub verified_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
@@ -68,6 +69,7 @@ pub struct CreateTaskRequest {
     pub prompt: String,
     pub bounty_sats: i64,
     pub stake_sats: Option<i64>,
+    pub buyer_pubkey: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -82,6 +84,11 @@ pub struct CreateTaskResponse {
 pub struct ClaimTaskRequest {
     pub worker_pubkey: String,
     pub worker_invoice: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AssignTaskRequest {
+    pub worker_pubkey: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -100,18 +107,41 @@ pub struct TaskStatusResponse {
     pub task_id: String,
     pub status: String,
     pub result: Option<String>,
+    pub failure_reason: Option<String>,
     pub payout_tx: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Agent {
     pub pubkey: String,
+    pub name: Option<String>,
+    pub avatar_url: Option<String>,
+    pub agent_type: Option<String>,
     pub lightning_address: Option<String>,
     pub reputation_score: f64,
     pub total_tasks: i64,
     pub successful_tasks: i64,
     pub total_earned_sats: i64,
+    pub is_active: Option<bool>,
     pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateAgentRequest {
+    pub name: String,
+    pub agent_type: Option<String>,
+    pub lightning_address: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpawnAgentRequest {
+    pub agent_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpawnAgentResponse {
+    pub agent: Agent,
+    pub message: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -190,4 +220,15 @@ pub struct WithdrawRequest {
 pub struct WithdrawResponse {
     pub payment_hash: String,
     pub amount_sats: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActivityEntry {
+    pub id: String,
+    pub agent_pubkey: String,
+    pub agent_name: Option<String>,
+    pub event_type: String,
+    pub event_data: Option<String>,
+    pub task_id: Option<String>,
+    pub created_at: String,
 }

@@ -2,6 +2,7 @@ mod commands;
 
 use clap::{Parser, Subcommand};
 use anyhow::Result;
+use std::path::Path;
 
 #[derive(Parser)]
 #[command(name = "oan-agent")]
@@ -65,8 +66,20 @@ enum Commands {
     Balance,
 }
 
+fn load_env() {
+    let paths = [".env", "backend/.env", "../backend/.env"];
+    for path in &paths {
+        if Path::new(path).exists() {
+            let _ = dotenv::from_path(path);
+            return;
+        }
+    }
+    let _ = dotenv::dotenv();
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
+    load_env();
     tracing_subscriber::fmt::init();
     
     let cli = Cli::parse();

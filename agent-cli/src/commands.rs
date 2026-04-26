@@ -15,6 +15,7 @@ struct Task {
     bounty_sats: i64,
     stake_sats: i64,
     status: String,
+    worker_pubkey: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -97,24 +98,55 @@ async fn worker_cycle(client: &reqwest::Client, config: &Config, pubkey: &str, l
         .json()
         .await?;
     
-    if tasks.is_empty() {
-        tracing::debug!("No tasks available");
+    let assigned_task = tasks.iter().find(|t| {
+        t.status == "claimed" && t.worker_pubkey.as_deref() == Some(pubkey)
+    });
+    
+    if let Some(task) = assigned_task {
+        tracing::info!("Found assigned task {} with {} sats bounty", task.id, task.bounty_sats);
+        let result = do_task_work(client, config, task, pubkey).await?;
+        
+        tracing::info!("Work complete, submitting result...");
+        
+        client
+            .post(format!("{}/api/tasks/{}/submit", config.api_url, task.id))
+            .json(&SubmitTaskRequest { result })
+            .send()
+            .await?;
+        
+        tracing::info!("Result submitted! Waiting for verification...");
         return Ok(());
     }
     
-    let task = &tasks[0];
+    let funded_task = tasks.iter().find(|t| t.status == "funded");
+    
+    let task = match funded_task {
+        Some(t) => t,
+        None => {
+            tracing::debug!("No funded tasks available");
+            return Ok(());
+        }
+    };
+    
     tracing::info!("Found task {} with {} sats bounty", task.id, task.bounty_sats);
     
-    let claim_res: ClaimTaskResponse = client
+    let claim_resp = client
         .post(format!("{}/api/tasks/{}/claim", config.api_url, task.id))
         .json(&ClaimTaskRequest {
             worker_pubkey: pubkey.to_string(),
             worker_invoice: ln_address.to_string(),
         })
         .send()
-        .await?
-        .json()
         .await?;
+
+    if !claim_resp.status().is_success() {
+        let status = claim_resp.status();
+        let err_text = claim_resp.text().await?;
+        tracing::warn!("Task claim failed with status {}: {}", status, err_text);
+        return Ok(());
+    }
+
+    let claim_res: ClaimTaskResponse = claim_resp.json().await?;
     
     if !claim_res.claimed {
         tracing::warn!("Task claim requires stake payment");
@@ -123,7 +155,7 @@ async fn worker_cycle(client: &reqwest::Client, config: &Config, pubkey: &str, l
     
     tracing::info!("Task claimed! Working on: {}", task.prompt);
     
-    let result = do_work_with_llm(&task.prompt, config).await?;
+    let result = do_task_work(client, config, task, pubkey).await?;
     
     tracing::info!("Work complete, submitting result...");
     
@@ -136,6 +168,34 @@ async fn worker_cycle(client: &reqwest::Client, config: &Config, pubkey: &str, l
     tracing::info!("Result submitted! Waiting for verification...");
     
     Ok(())
+}
+
+async fn do_task_work(_client: &reqwest::Client, config: &Config, task: &Task, pubkey: &str) -> Result<String> {
+    if let Some(api_key) = &config.fireworks_key {
+        let llm_client = reqwest::Client::new();
+        
+        let response = llm_client
+            .post("https://api.fireworks.ai/inference/v1/chat/completions")
+            .header("Authorization", format!("Bearer {}", api_key))
+            .json(&serde_json::json!({
+                "model": config.fireworks_model,
+                "messages": [
+                    {"role": "system", "content": "You are a helpful AI agent completing tasks. Be concise and accurate."},
+                    {"role": "user", "content": &task.prompt}
+                ],
+                "max_tokens": 500,
+            }))
+            .send()
+            .await?
+            .json::<serde_json::Value>()
+            .await?;
+        
+        if let Some(content) = response["choices"][0]["message"]["content"].as_str() {
+            return Ok(content.to_string());
+        }
+    }
+    
+    Ok(format!("Worker {} completed: {}", pubkey, task.prompt))
 }
 
 async fn do_work_with_llm(prompt: &str, config: &Config) -> Result<String> {

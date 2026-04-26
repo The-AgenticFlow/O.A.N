@@ -114,6 +114,18 @@ body::after {
     box-shadow: 0 0 20px rgba(0, 229, 255, 0.15), 0 0 40px rgba(0, 229, 255, 0.05);
   }
 
+  .glow-green {
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.15), 0 0 40px rgba(0, 255, 136, 0.05);
+  }
+
+  .text-green-success {
+    color: var(--green-success);
+  }
+
+  .text-alert {
+    color: var(--red-alert);
+  }
+
   .terminal-cursor {
     animation: blink 1s step-end infinite;
   }

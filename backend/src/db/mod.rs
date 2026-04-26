@@ -148,6 +148,10 @@ pub mod tasks {
         db.list("tasks", Some(("status", "eq.funded".to_string())), Some(("bounty_sats", "desc"))).await
     }
 
+    pub async fn list_all(db: &Database) -> Result<Vec<Task>> {
+        db.list("tasks", None, Some(("created_at", "desc"))).await
+    }
+
     pub async fn list_by_buyer(db: &Database, pubkey: &str) -> Result<Vec<Task>> {
         db.list("tasks", Some(("buyer_pubkey", format!("eq.{}", pubkey))), Some(("created_at", "desc"))).await
     }
@@ -179,6 +183,15 @@ pub mod tasks {
         })).await
     }
 
+    pub async fn assign(db: &Database, id: &str, worker_pubkey: String) -> Result<()> {
+        let now = Utc::now().to_rfc3339();
+        db.update("tasks", "id", id, &json!({
+            "worker_pubkey": worker_pubkey,
+            "status": "claimed",
+            "updated_at": now,
+        })).await
+    }
+
     pub async fn submit_result(db: &Database, id: &str, result: String) -> Result<()> {
         let now = Utc::now().to_rfc3339();
         db.update("tasks", "id", id, &json!({
@@ -197,10 +210,11 @@ pub mod tasks {
         })).await
     }
 
-    pub async fn fail(db: &Database, id: &str) -> Result<()> {
+    pub async fn fail(db: &Database, id: &str, reason: &str) -> Result<()> {
         let now = Utc::now().to_rfc3339();
         db.update("tasks", "id", id, &json!({
             "status": "failed",
+            "failure_reason": reason,
             "updated_at": now,
         })).await
     }
@@ -208,16 +222,61 @@ pub mod tasks {
 
 pub mod agents {
     use super::*;
-    use crate::models::Agent;
+    use crate::models::{Agent, CreateAgentRequest};
+    use uuid::Uuid;
 
     pub async fn find_by_pubkey(db: &Database, pubkey: &str) -> Result<Option<Agent>> {
         db.get_one("agents", "pubkey", pubkey).await
     }
 
+    pub async fn list_all(db: &Database) -> Result<Vec<Agent>> {
+        db.list("agents", None, Some(("created_at", "desc"))).await
+    }
+
+    pub async fn list_active(db: &Database) -> Result<Vec<Agent>> {
+        db.list("agents", Some(("is_active", "eq.true".to_string())), Some(("created_at", "desc"))).await
+    }
+
+    pub async fn create(db: &Database, req: CreateAgentRequest) -> Result<Agent> {
+        let pubkey = format!("agent_{}", Uuid::new_v4());
+        let now = chrono::Utc::now().to_rfc3339();
+
+        let avatar_url = generate_avatar_url(&req.name);
+
+        let body = json!({
+            "pubkey": pubkey,
+            "name": req.name,
+            "avatar_url": avatar_url,
+            "agent_type": req.agent_type.unwrap_or_else(|| "worker".to_string()),
+            "lightning_address": req.lightning_address,
+            "is_active": false,
+            "created_at": now,
+        });
+
+        let resp = db.client
+            .post(format!("{}/rest/v1/agents", db.url))
+            .header("apikey", &db.anon_key)
+            .header("Authorization", format!("Bearer {}", &db.anon_key))
+            .header("Content-Type", "application/json")
+            .header("Prefer", "return=representation")
+            .json(&body)
+            .send()
+            .await?
+            .error_for_status()?;
+
+        let rows: Vec<Agent> = resp.json().await?;
+        rows.into_iter().next().ok_or_else(|| anyhow::anyhow!("Insert returned no rows"))
+    }
+
+    pub async fn set_active(db: &Database, pubkey: &str, is_active: bool) -> Result<()> {
+        db.update("agents", "pubkey", pubkey, &json!({
+            "is_active": is_active,
+        })).await
+    }
+
     pub async fn create_or_update(db: &Database, pubkey: &str, ln_address: Option<String>) -> Result<Agent> {
         let now = chrono::Utc::now().to_rfc3339();
 
-        // Supabase upsert via POST with ?on_conflict=pubkey
         let body = json!({
             "pubkey": pubkey,
             "lightning_address": ln_address,
@@ -241,7 +300,6 @@ pub mod agents {
     }
 
     pub async fn update_reputation(db: &Database, pubkey: &str, success: bool, earned_sats: i64) -> Result<()> {
-        // PostgREST doesn't support computed columns in PATCH, so we fetch, compute locally, then update
         let agent: Option<Agent> = db.get_one("agents", "pubkey", pubkey).await?;
         if let Some(a) = agent {
             let total_tasks = a.total_tasks + 1;
@@ -258,6 +316,12 @@ pub mod agents {
             db.update("agents", "pubkey", pubkey, &body).await?;
         }
         Ok(())
+    }
+
+    fn generate_avatar_url(name: &str) -> String {
+        let seed = name.chars().map(|c| c as u32).sum::<u32>();
+        let style = seed % 8;
+        format!("https://api.dicebear.com/7.x/bottts/svg?seed={}&style=layer{}", urlencoding::encode(name), style)
     }
 }
 
@@ -305,7 +369,75 @@ pub mod payments {
         })).await
     }
 
+    pub async fn update_status(db: &Database, id: &str, status: PaymentStatus) -> Result<()> {
+        let now = Utc::now().to_rfc3339();
+        let status_str = status.to_string();
+        let body = if status == PaymentStatus::Paid {
+            json!({
+                "status": status_str,
+                "settled_at": now,
+            })
+        } else {
+            json!({
+                "status": status_str,
+            })
+        };
+        db.update("payments", "id", id, &body).await
+    }
+
     pub async fn list_by_task(db: &Database, task_id: &str) -> Result<Vec<Payment>> {
         db.list("payments", Some(("task_id", format!("eq.{}", task_id))), Some(("created_at", "desc"))).await
+    }
+
+    pub async fn list_pending(db: &Database) -> Result<Vec<Payment>> {
+        db.list("payments", Some(("status", "eq.pending".to_string())), Some(("created_at", "desc"))).await
+    }
+}
+
+pub mod activity {
+    use super::*;
+    use crate::models::ActivityEntry;
+    use uuid::Uuid;
+    use chrono::Utc;
+
+    pub async fn log_event(
+        db: &Database,
+        agent_pubkey: &str,
+        agent_name: Option<&str>,
+        event_type: &str,
+        event_data: Option<&str>,
+        task_id: Option<&str>,
+    ) -> Result<()> {
+        let id = Uuid::new_v4().to_string();
+        let now = Utc::now().to_rfc3339();
+
+        let body = json!({
+            "id": id,
+            "agent_pubkey": agent_pubkey,
+            "agent_name": agent_name,
+            "event_type": event_type,
+            "event_data": event_data,
+            "task_id": task_id,
+            "created_at": now,
+        });
+
+        let _: Vec<ActivityEntry> = db.insert("activity_log", &body).await?;
+        Ok(())
+    }
+
+    pub async fn list_recent(db: &Database, limit: usize) -> Result<Vec<ActivityEntry>> {
+        let mut req = db.client
+            .get(format!("{}/rest/v1/activity_log", db.url))
+            .header("apikey", &db.anon_key)
+            .header("Authorization", format!("Bearer {}", &db.anon_key))
+            .header("Content-Type", "application/json")
+            .header("Prefer", "return=representation")
+            .query(&[("select", "*")])
+            .query(&[("order", "created_at.desc")])
+            .query(&[("limit", limit.to_string())]);
+
+        let resp = req.send().await?;
+        let body: Vec<ActivityEntry> = resp.json().await?;
+        Ok(body)
     }
 }

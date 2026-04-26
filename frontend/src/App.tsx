@@ -1,9 +1,9 @@
 import { Outlet, NavLink } from 'react-router-dom'
-import { Zap, User, Bot, Terminal } from 'lucide-react'
+import { Zap, User, Bot, Terminal, Cpu, Activity } from 'lucide-react'
 
 export default function App() {
   return (
-    <div className="min-h-screen text-void-surface font-body relative">
+    <div className="min-h-screen text-text-primary font-body relative">
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute inset-0 bg-void-deep" />
         <div 
@@ -40,7 +40,7 @@ export default function App() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold amber-text tracking-tight">OAN</h1>
-                <span className="text-[10px] font-mono text-cyan-400/70 tracking-widest uppercase">Agent Marketplace</span>
+                <span className="text-[10px] font-mono text-cyan-400 tracking-widest uppercase">Agent Marketplace</span>
               </div>
             </div>
             
@@ -51,7 +51,7 @@ export default function App() {
                   `flex items-center gap-2 px-4 py-2 rounded-md transition-all duration-200 font-medium text-sm ${
                     isActive 
                       ? 'bg-amber-400/10 text-amber-400 border border-amber-400/20' 
-                      : 'text-void-border hover:text-amber-300 border border-transparent'
+                      : 'text-text-secondary hover:text-amber-300 border border-transparent'
                   }`
                 }
               >
@@ -64,7 +64,7 @@ export default function App() {
                   `flex items-center gap-2 px-4 py-2 rounded-md transition-all duration-200 font-medium text-sm ${
                     isActive 
                       ? 'bg-cyan-400/10 text-cyan-400 border border-cyan-400/20' 
-                      : 'text-void-border hover:text-cyan-300 border border-transparent'
+                       : 'text-text-secondary hover:text-cyan-300 border border-transparent'
                   }`
                 }
               >
@@ -77,12 +77,38 @@ export default function App() {
                   `flex items-center gap-2 px-4 py-2 rounded-md transition-all duration-200 font-medium text-sm ${
                     isActive 
                       ? 'bg-amber-400/10 text-amber-400 border border-amber-400/20' 
-                      : 'text-void-border hover:text-amber-300 border border-transparent'
+                      : 'text-text-secondary hover:text-amber-300 border border-transparent'
                   }`
                 }
               >
                 <Bot className="w-4 h-4" />
                 Agent
+              </NavLink>
+              <NavLink 
+                to="/agents" 
+                className={({ isActive }) => 
+                  `flex items-center gap-2 px-4 py-2 rounded-md transition-all duration-200 font-medium text-sm ${
+                    isActive 
+                      ? 'bg-purple-400/10 text-purple-400 border border-purple-400/20' 
+                      : 'text-text-secondary hover:text-purple-300 border border-transparent'
+                  }`
+                }
+              >
+                <Cpu className="w-4 h-4" />
+                Spawn
+              </NavLink>
+              <NavLink 
+                to="/activity" 
+                className={({ isActive }) => 
+                  `flex items-center gap-2 px-4 py-2 rounded-md transition-all duration-200 font-medium text-sm ${
+                    isActive 
+                      ? 'bg-cyan-400/10 text-cyan-400 border border-cyan-400/20' 
+                      : 'text-text-secondary hover:text-cyan-300 border border-transparent'
+                  }`
+                }
+              >
+                <Activity className="w-4 h-4" />
+                Activity
               </NavLink>
             </nav>
           </div>

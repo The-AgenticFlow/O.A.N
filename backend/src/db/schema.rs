@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     worker_pubkey TEXT,
     worker_invoice TEXT,
     result TEXT,
+    failure_reason TEXT,
     verified_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
@@ -18,11 +19,15 @@ CREATE TABLE IF NOT EXISTS tasks (
 
 CREATE TABLE IF NOT EXISTS agents (
     pubkey TEXT PRIMARY KEY,
+    name TEXT,
+    avatar_url TEXT,
+    agent_type TEXT DEFAULT 'worker',
     lightning_address TEXT,
     reputation_score REAL DEFAULT 0.0,
     total_tasks INTEGER DEFAULT 0,
     successful_tasks INTEGER DEFAULT 0,
     total_earned_sats INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT false,
     created_at TEXT NOT NULL
 );
 
@@ -49,9 +54,42 @@ CREATE TABLE IF NOT EXISTS l402_tokens (
     used_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS activity_log (
+    id TEXT PRIMARY KEY,
+    agent_pubkey TEXT NOT NULL,
+    agent_name TEXT,
+    event_type TEXT NOT NULL,
+    event_data TEXT,
+    task_id TEXT,
+    created_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_buyer ON tasks(buyer_pubkey);
 CREATE INDEX IF NOT EXISTS idx_tasks_worker ON tasks(worker_pubkey);
 CREATE INDEX IF NOT EXISTS idx_payments_hash ON payments(payment_hash);
 CREATE INDEX IF NOT EXISTS idx_payments_task ON payments(task_id);
+CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_activity_agent ON activity_log(agent_pubkey);
+"#;
+
+pub const MIGRATE_AGENTS: &str = r#"
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS name TEXT;
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS agent_type TEXT DEFAULT 'worker';
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT false;
+"#;
+
+pub const MIGRATE_ACTIVITY: &str = r#"
+CREATE TABLE IF NOT EXISTS activity_log (
+    id TEXT PRIMARY KEY,
+    agent_pubkey TEXT NOT NULL,
+    agent_name TEXT,
+    event_type TEXT NOT NULL,
+    event_data TEXT,
+    task_id TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_activity_agent ON activity_log(agent_pubkey);
 "#;
