@@ -14,9 +14,9 @@
   --cyan-dim: #008b8b;
   --red-alert: #ff3d3d;
   --green-success: #00ff88;
-  --text-primary: #e8e8f0;
-  --text-secondary: #8888a0;
-  --text-dim: #55556a;
+  --text-primary: #f0f0f8;
+  --text-secondary: #b0b0cc;
+  --text-dim: #7878a0;
   --font-body: 'Outfit', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
@@ -47,8 +47,8 @@ body::before {
       0deg,
       transparent,
       transparent 2px,
-      rgba(0, 229, 255, 0.015) 2px,
-      rgba(0, 229, 255, 0.015) 4px
+      rgba(0, 229, 255, 0.008) 2px,
+      rgba(0, 229, 255, 0.008) 4px
     );
   pointer-events: none;
   z-index: 1000;

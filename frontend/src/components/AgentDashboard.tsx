@@ -98,7 +98,7 @@ export default function AgentDashboard() {
             <Zap className="w-6 h-6 text-amber-400" />
             <h2 className="text-3xl font-bold tracking-tight">Agent Dashboard</h2>
           </div>
-          <p className="text-void-border font-mono text-sm">Post tasks and manage your workflow</p>
+          <p className="text-text-secondary font-mono text-sm">Post tasks and manage your workflow</p>
         </div>
         <button
           onClick={() => setShowCreate(true)}
@@ -111,28 +111,28 @@ export default function AgentDashboard() {
 
       <div className="grid grid-cols-3 gap-4 mb-10">
         <div className="terminal-panel p-5 animate-fade-in-up stagger-1">
-          <div className="flex items-center gap-2 text-void-border mb-3 font-mono text-sm">
+          <div className="flex items-center gap-2 text-text-secondary mb-3 font-mono text-sm">
             <Zap className="w-4 h-4 text-amber-400" />
             Balance
           </div>
           <div className="text-2xl font-bold font-mono">{stats.balance_sats.toLocaleString()}</div>
-          <div className="text-xs text-void-border/50 mt-1">sats available</div>
+          <div className="text-xs text-text-dim mt-1">sats available</div>
         </div>
         <div className="terminal-panel p-5 animate-fade-in-up stagger-2">
-          <div className="flex items-center gap-2 text-void-border mb-3 font-mono text-sm">
+          <div className="flex items-center gap-2 text-text-secondary mb-3 font-mono text-sm">
             <Clock className="w-4 h-4 text-cyan-400" />
             Pending
           </div>
           <div className="text-2xl font-bold font-mono">{stats.pending_sats.toLocaleString()}</div>
-          <div className="text-xs text-void-border/50 mt-1">sats in escrow</div>
+          <div className="text-xs text-text-dim mt-1">sats in escrow</div>
         </div>
         <div className="terminal-panel p-5 animate-fade-in-up stagger-3">
-          <div className="flex items-center gap-2 text-void-border mb-3 font-mono text-sm">
-            <TrendingUp className="w-4 h-4 text-success" />
+          <div className="flex items-center gap-2 text-text-secondary mb-3 font-mono text-sm">
+            <TrendingUp className="w-4 h-4 text-green-success" />
             Total Earned
           </div>
           <div className="text-2xl font-bold amber-text font-mono">{stats.total_earned.toLocaleString()}</div>
-          <div className="text-xs text-void-border/50 mt-1">sats lifetime</div>
+          <div className="text-xs text-text-dim mt-1">sats lifetime</div>
         </div>
       </div>
 
@@ -151,7 +151,7 @@ export default function AgentDashboard() {
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2 font-mono text-void-border">Task Description</label>
+                <label className="block text-sm font-medium mb-2 font-mono text-text-secondary">Task Description</label>
                 <textarea
                   value={newTask.prompt}
                   onChange={(e) => setNewTask({ ...newTask, prompt: e.target.value })}

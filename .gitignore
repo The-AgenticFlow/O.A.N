@@ -31,3 +31,6 @@ frontend/dist/
 
 # Database
 *.db
+
+# TypeScript build info
+*.tsbuildinfo
